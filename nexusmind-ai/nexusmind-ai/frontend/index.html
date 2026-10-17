@@ -1,0 +1,97 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>NexusMind AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#0b1226;--panel:#121b36;--line:#25305a;--tx:#e8ecf8;--mu:#9aa6c8;--teal:#2dd4bf;--vio:#a78bfa;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root:not([data-theme="dark"]){color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1226,#140f33);color:var(--tx);font:15px/1.55 "Source Sans 3",system-ui,sans-serif;display:flex;min-height:100vh}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0}
+nav{width:210px;padding:20px 12px;border-right:1px solid var(--line);flex:none}
+nav b{display:block;padding:0 10px 16px;font-family:Georgia,serif;font-size:18px}
+nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--mu);padding:9px 10px;border-radius:6px;font:inherit;cursor:pointer}
+nav button[aria-current=true]{background:var(--panel);color:var(--tx);box-shadow:inset 2px 0 var(--teal)}
+nav button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--vio);outline-offset:2px}
+main{flex:1;padding:28px;min-width:0;max-width:1000px}
+.banner{border:1px solid var(--vio);color:var(--vio);border-radius:6px;padding:6px 10px;font-size:13px;margin:10px 0 20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:12px}
+.stats{display:flex;gap:12px;flex-wrap:wrap}.stats .card{flex:1;min-width:140px}.stats b{font:600 26px Georgia,serif;color:var(--teal);display:block}
+.btn{background:var(--teal);color:#06231f;border:0;border-radius:6px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.btn.alt{background:none;border:1px solid var(--line);color:var(--tx)}
+input{background:#0b1226;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:9px 12px;font:inherit;width:100%;max-width:520px}
+.mu{color:var(--mu)}.tag{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--mu)}
+svg{width:100%;height:auto;max-width:100%;background:#0d1530;border:1px solid var(--line);border-radius:8px}
+section{display:none}section.on{display:block}
+@media(max-width:700px){body{flex-direction:column}nav{width:100%;display:flex;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}nav b{display:none}nav button{width:auto;white-space:nowrap}main{padding:16px}}
+@media(prefers-reduced-motion:no-preference){.card{transition:border-color .15s}}
+</style></head><body>
+<nav aria-label="Main"><b>NexusMind AI</b><div id="nav"></div></nav>
+<main>
+<div class="banner">Real papers (metadata checked against arXiv). Claims are paraphrased from abstracts and excerpts are short verbatim abstract quotes. Links between claims are AI-inferred and unverified.</div>
+
+<section id="overview" class="on"><h1>Find what connects your research</h1>
+<p class="mu">Don't just read research. Discover what connects it, challenges it, and comes next.</p>
+<p><input id="gq" placeholder="Ask about the indexed papers" aria-label="Research question"> <button class="btn" onclick="go('detective');q.value=gq.value;ask()">Start research</button></p>
+<div class="stats" id="stats"></div>
+<h3 style="margin:20px 0 8px">Candidate research gaps</h3><div id="ovgaps"></div></section>
+
+<section id="library"><h2>Research Library</h2><div id="papers" style="margin-top:12px"></div>
+<p class="mu">PDF upload is implemented in the backend (<code>POST /api/papers/upload</code>); this offline page lists demo papers only.</p></section>
+
+<section id="graph"><h2>Knowledge Graph</h2><p class="mu">Select a node to see its evidence. Contradiction edges are dashed.</p>
+<svg id="svg" viewBox="0 0 760 420" role="img" aria-label="Knowledge graph"></svg><div class="card" id="detail" style="margin-top:12px">No node selected.</div></section>
+
+<section id="detective"><h2>Research Detective</h2>
+<p><input id="q" placeholder="e.g. How do language models use long context, and what extends it?" aria-label="Question"> <button class="btn" onclick="ask()">Ask</button></p>
+<div id="ans"></div></section>
+
+<section id="radar"><h2>Contradiction Radar</h2><div id="cx"></div></section>
+<section id="gaps"><h2>Research Gap Explorer</h2><div id="gp"></div></section>
+<section id="hyp"><h2>Hypothesis Studio</h2><p class="mu">Pick a candidate gap to draft a proposed (untested) plan.</p><div id="hlist"></div><div id="hout"></div></section>
+<section id="reports"><h2>Reports</h2><p><button class="btn" onclick="genReport()">Generate report</button></p><div id="rout"></div></section>
+<section id="settings"><h2>Settings</h2><div class="card" id="conn">Checking backend…</div></section>
+</main>
+<script>
+const P=[{id:"p1",t:"MemGPT: Towards LLMs as Operating Systems",y:2023,a:"Packer et al. · arXiv 2310.08560"},{id:"p2",t:"Generative Agents: Interactive Simulacra of Human Behavior",y:2023,a:"Park et al. · arXiv 2304.03442"},{id:"p3",t:"Lost in the Middle: How Language Models Use Long Contexts",y:2023,a:"Liu et al. · arXiv 2307.03172"}];
+const C=[{id:"c1",p:"p1",k:"finding",t:"Paging data between a limited context window and external storage, like OS virtual memory, extends usable context for language models.",e:"we propose virtual context management",pg:1},
+{id:"c2",p:"p2",k:"finding",t:"Agents can store experiences, synthesize them into higher-level reflections, and retrieve them to plan behavior.",e:"synthesize those memories over time into higher-level reflections",pg:1},
+{id:"c3",p:"p3",k:"finding",t:"Language model performance can degrade significantly depending on where relevant information sits in a long input.",e:"performance can degrade significantly when changing the position of relevant information",pg:1}];
+const X=[{id:"x1",a:"c1",b:"c3",s:"unresolved",n:"AI-inferred candidate tension, unverified. c3 studies position sensitivity inside one long input; c1 avoids long inputs by paging. They may not conflict at all."}];
+const E=[["p1","c1"],["p2","c2"],["p3","c3"],["c1","c3","x"]];
+const pos={p1:[110,110],p2:[110,210],p3:[110,310],c1:[420,110],c2:[420,210],c3:[420,310]};
+const col={paper:"#2dd4bf",finding:"#a78bfa",limitation:"#f59e0b"};
+const $=id=>document.getElementById(id),esc=s=>s.replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const pt=id=>P.find(p=>p.id===id).t, cl=id=>C.find(c=>c.id===id);
+const tabs=[["overview","Overview"],["library","Research Library"],["graph","Knowledge Graph"],["detective","Research Detective"],["radar","Contradiction Radar"],["gaps","Research Gap Explorer"],["hyp","Hypothesis Studio"],["reports","Reports"],["settings","Settings"]];
+$("nav").innerHTML=tabs.map(([i,l])=>`<button data-t="${i}" onclick="go('${i}')">${l}</button>`).join("");
+function go(i){document.querySelectorAll("section").forEach(s=>s.classList.toggle("on",s.id===i));document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-current",b.dataset.t===i))}
+const gaps=()=>[["Does tiered memory paging reduce position sensitivity in long-context use?",[C[0],C[2]]]];
+$("stats").innerHTML=[[P.length,"papers indexed"],[C.length,"claims extracted"],[E.length,"graph relationships"]].map(([n,l])=>`<div class="card"><b>${n}</b>${l}</div>`).join("");
+const gapHtml=()=>gaps().map(([t,v])=>`<div class="card"><h3>${esc(t)}</h3><p class="mu">Draws on ${v.length} papers: ${v.map(c=>esc(pt(c.p))).join("; ")}</p><p>${v.map(c=>`<span class="tag">p.${c.pg} ${esc(c.e)}</span>`).join(" ")}</p><p class="mu">AI-inferred candidate gap within the indexed corpus only. The papers do not state it; novelty needs human literature review.</p></div>`).join("");
+$("ovgaps").innerHTML=$("gp").innerHTML=gapHtml();
+$("papers").innerHTML=P.map(p=>`<div class="card"><b>${esc(p.t)}</b> <span class="tag">${p.y}</span> <span class="tag">${esc(p.a)}</span><br><span class="mu">${C.filter(c=>c.p==p.id).length} claim(s) · status: ready</span></div>`).join("");
+// graph
+$("svg").innerHTML=E.map(([a,b,x])=>`<line x1="${pos[a][0]}" y1="${pos[a][1]}" x2="${pos[b][0]}" y2="${pos[b][1]}" stroke="${x?"#f87171":"#3a4780"}" stroke-width="1.5" ${x?'stroke-dasharray="5 4"':""}/>`).join("")+
+ [...P.map(p=>[p.id,"paper",p.t.slice(0,22)]),...C.map(c=>[c.id,c.k,c.t.slice(0,26)+"…"])].map(([id,k,l])=>`<g tabindex="0" role="button" aria-label="${esc(l)}" style="cursor:pointer" onclick="sel('${id}')" onkeydown="if(event.key=='Enter')sel('${id}')"><circle cx="${pos[id][0]}" cy="${pos[id][1]}" r="10" fill="${col[k]}"/><text x="${pos[id][0]+14}" y="${pos[id][1]+4}" fill="#e8ecf8" font-size="11">${esc(l)}</text></g>`).join("");
+function sel(id){const c=cl(id),p=P.find(p=>p.id==id);$("detail").innerHTML=p?`<b>${esc(p.t)}</b><br><span class="mu">${C.filter(c=>c.p==id).map(c=>esc(c.t)).join("<br>")}</span>`:`<b>${esc(c.t)}</b> <span class="tag">${c.k}</span><br><span class="mu">Source: ${esc(pt(c.p))}, p.${c.pg}<br>Excerpt: ${esc(c.e)}</span>`}
+// detective
+const STOP=/\b(the|a|of|and|in|to|is|are|what|which|how|for|on|with)\b/g,tk=s=>new Set((s.toLowerCase().match(/[a-z]+/g)||[]).filter(w=>w.length>2&&!STOP.test(w)));
+function ask(){const t=tk(q.value);const h=C.map(c=>[[...tk(c.t)].filter(w=>t.has(w)).length,c]).filter(x=>x[0]).sort((a,b)=>b[0]-a[0]).slice(0,5).map(x=>x[1]);
+ $("ans").innerHTML=!h.length?`<div class="card">Insufficient evidence in the indexed corpus.</div>`:
+ `<div class="card mu">Keyword-matched evidence only. No LLM is configured, so no synthesized answer is shown.</div>`+h.map(c=>`<div class="card">${esc(c.t)}<br><span class="tag">${esc(pt(c.p))} · p.${c.pg}</span> <span class="mu">${esc(c.e)}</span></div>`).join("")+
+ X.filter(x=>h.some(c=>c.id==x.a||c.id==x.b)).map(x=>`<div class="card" style="border-color:#f87171">Conflicting evidence flagged: see Contradiction Radar.</div>`).join("")}
+// radar
+function rd(){$("cx").innerHTML=X.map(x=>{const a=cl(x.a),b=cl(x.b);return `<div class="card"><p>A: ${esc(a.t)}<br><span class="mu">${esc(pt(a.p))}, p.${a.pg} — ${esc(a.e)}</span></p><p>B: ${esc(b.t)}<br><span class="mu">${esc(pt(b.p))}, p.${b.pg} — ${esc(b.e)}</span></p><p class="mu">${esc(x.n)}</p><p>Status: <b>${x.s.replace(/_/g," ")}</b></p>${["confirmed","unresolved","not_a_contradiction"].map(s=>`<button class="btn alt" onclick="X[0].s='${s}';rd()">${s.replace(/_/g," ")}</button>`).join(" ")}</div>`}).join("")}
+rd();
+const BASE=window.NEXUS_API??(location.port==="8000"?"":"http://localhost:8000");
+let live=false;
+const NO="Backend not connected. Start the FastAPI backend on http://localhost:8000 (see backend/README.md) and reload this page.";
+async function api(p,o){const r=await fetch(BASE+p,o);if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.detail||r.status)}return r}
+fetch(BASE+"/health").then(r=>r.json()).then(h=>{live=h.status==="ok";$("conn").innerHTML=`Backend connected. Store: ${esc(h.store)}. Neo4j: ${esc(h.neo4j)}. LLM: ${esc(h.llm)}.`}).catch(()=>{$("conn").textContent=NO});
+$("hlist").innerHTML=gaps().map(([t])=>`<div class="card">${esc(t)} <button class="btn alt" data-g="${esc(t)}" onclick="hypGen(this.dataset.g)">Draft hypothesis</button></div>`).join("");
+async function hypGen(t){const o=$("hout");try{const h=await(await api("/api/hypotheses/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gap_title:t})})).json();
+ const L=(a)=>a.map(x=>typeof x==="string"?esc(x):`${esc(x.name)} <span class="tag">${esc(x.label)}</span>`).join("; ");
+ o.innerHTML=`<div class="card"><b>${esc(h.status)}</b><p>Research question: ${esc(h.research_question)}</p><p>Hypothesis: ${esc(h.hypothesis)}</p><p>Null: ${esc(h.null_hypothesis)}</p><p>Independent: ${L(h.independent_variables)}<br>Dependent: ${L(h.dependent_variables)}</p><p>Baselines: ${L(h.baselines)}<br>Datasets: ${L(h.datasets)}</p><p>Ablations: ${L(h.ablations)}<br>Confounders: ${L(h.confounders)}<br>Reproducibility: ${L(h.reproducibility)}</p><p class="mu">Evidence: ${L(h.evidence)}<br>${esc(h.note)}</p></div>`}catch(e){o.innerHTML=`<div class="card">${esc(live?String(e.message):NO)}</div>`}}
+let md="";
+async function genReport(){const o=$("rout");try{const r=await(await api("/api/reports/generate",{method:"POST"})).json();md=r.markdown;
+ o.innerHTML=`<p><button class="btn alt" onclick="navigator.clipboard.writeText(md)">Copy</button> <a class="btn alt" style="text-decoration:none;display:inline-block" href="${BASE}/api/reports/${r.id}/export?format=md" download="report.md">Markdown</a> <a class="btn alt" style="text-decoration:none;display:inline-block" href="${BASE}/api/reports/${r.id}/export?format=pdf" download="report.pdf">PDF</a></p><pre class="card" style="white-space:pre-wrap" id="rpre"></pre>`;$("rpre").textContent=md}catch(e){o.innerHTML=`<div class="card">${esc(live?String(e.message):NO)}</div>`}}
+</script></body></html>
